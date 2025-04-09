@@ -33,6 +33,11 @@ class Strategy:
 
 
 class Kelp(Strategy):
+  def __init__(self, symbol: str, limit: int):
+    super().__init__(symbol=symbol, limit=limit)
+    
+  def run(self, state: TradingState) -> List[Order]:
+    pass
   pass
 
 
@@ -48,12 +53,15 @@ class RainForestResin(Strategy):
     else:
       order_depth = state.order_depths[self.symbol]
     
+    #Max out the buys
+    #If price is less than 10000 then buy
       if len(order_depth.sell_orders) != 0:
                 best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
                 if int(best_ask) < acceptable_price:
                     print("BUY", str(-best_ask_amount) + "x", best_ask)
                     orders.append(Order(symbol=self.symbol, best_ask=best_ask, best_ask_amount=-best_ask_amount))
     
+    #If price is more than 10000 sell it
       if len(order_depth.buy_orders) != 0:
                 best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
                 if int(best_bid) > acceptable_price:
@@ -61,7 +69,13 @@ class RainForestResin(Strategy):
                     orders.append(Order(symbol=self.symbol, best_bid=best_bid, best_bid_amount=-best_bid_amount))
       return orders
 
+
 class Squid_Ink(Strategy):
+  def __init__(self, symbol: str, limit: int):
+    super().__init__(symbol=symbol, limit=limit)
+    
+  def run(self, state: TradingState) -> List[Order]:
+    pass
   pass
 
 
@@ -71,7 +85,8 @@ class Trader:
       # Create each strategy for each product here
       self.strategies = {
         "RAINFOREST_RESIN" : RainForestResin("RAINFOREST_RESIN", 50),
-        "KELP": Kelp("KELP", 50)
+        "KELP": Kelp("KELP", 50),
+        "SQUID_INK": Squid_Ink("SQUID_INK", 0) #Put number here
       }
 
       self.trader_data = {}  #storing state between rounds
