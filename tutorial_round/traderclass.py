@@ -126,7 +126,8 @@ class Trader:
       # Create each strategy for each product here
       self.strategies = {
         "RAINFOREST_RESIN" : RainForestResin("RAINFOREST_RESIN", 50),
-        "KELP": Kelp("KELP", 50)
+        "KELP": Kelp("KELP", 50),
+        "SQUID_INK": SquidInk("SQUID_INK", 50)
       }
 
       self.trader_data = {}  #storing state between rounds
