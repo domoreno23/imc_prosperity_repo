@@ -45,10 +45,3 @@ for i in trades:
     #print('cuN: ', cuN)
 
 
-
-
-    
-        
-
-
-
