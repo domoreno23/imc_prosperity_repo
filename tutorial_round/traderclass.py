@@ -1,5 +1,6 @@
 from datamodel import OrderDepth, UserId, TradingState, Order
 from typing import Dict, List
+import numpy as np
 import string
 import json
 from collections import deque
@@ -11,7 +12,7 @@ class Kelp():
 
   ##Calculating the acceptable price
   def calculate_value(self, order_depth: OrderDepth, depth: int):
-     if len(order_depth.sell_orders) != 0 and len(order_depth.buy_orders) != 0:
+    if len(order_depth.sell_orders) != 0 and len(order_depth.buy_orders) != 0:
       buy_orders = order_depth.buy_orders
       sell_orders = order_depth.sell_orders
       
@@ -34,7 +35,7 @@ class Kelp():
     
     order_depth = state.order_depths[self.symbol]
     acceptable_price = self.calculate_value(order_depth, 5)
-           
+
     if len(order_depth.sell_orders) != 0:
       best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
       if int(best_ask) < acceptable_price:
@@ -73,51 +74,53 @@ class SquidInk():
   def __init__(self, symbol: str, limit: int):
     self.symbol = symbol
     self.limit = limit
-    self.window = deque
+    self.window: Dict[str, List[int]] = {}  # Keeps a rolling list of prices per product
 
-  def calculate_value(self, order_depth: OrderDepth, depth: int):
-    if len(order_depth.sell_orders) != 0 and len(order_depth.buy_orders) != 0:
-      buy_orders = order_depth.buy_orders
-      sell_orders = order_depth.sell_orders
+  def calculate_z_score(self, order_depth: OrderDepth, window_size: int):
+    z_score = 0
+    #Getting the best ask and sell order
+    best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
+    best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else None
+    current_mid_price = (best_bid + best_ask) / 2 if best_bid and best_ask else None
+    
+    #Used to get a dictionary with the last *window_size value* of Squid Ink
+    last_windowsize_prices = self.window.setdefault(self.symbol, [])
+    
+    # Update price history and make sure the last *window_size value* are in the list
+    if current_mid_price:
+        last_windowsize_prices.append(current_mid_price)
+        if len(last_windowsize_prices) > window_size:  
+            last_windowsize_prices.pop(0)
+    
+    #Calculating the z score
+    if len(last_windowsize_prices) >= window_size:
+      sma = np.mean(last_windowsize_prices)
+      std = np.std(last_windowsize_prices)
+      z_score = ((current_mid_price - sma)/std)
       
-      #Sort the top n volumes in the each side
-      top_buys = sorted(buy_orders.items(), key=lambda x: -x[0])[:depth]
-      top_sells = sorted(sell_orders.items(), key=lambda x: x[0])[:depth]
-
-      total_volume = 0 
-      weighted_sum = 0
-
-      #Calculate the weighted average
-      for price, volume in top_buys + top_sells:
-          total_volume += abs(volume)
-          weighted_sum += price * abs(volume)
-
-      average = weighted_sum / total_volume if total_volume != 0 else None
-
-      if average is not None:
-        if len(self.window) >= 60:
-          self.window.popleft(0)
-        self.window.append(average)
-
-      return sum(self.window) / len(self.window) if len(self.window) != 0 else None
+    return z_score, best_ask, best_bid
 
   def run(self, state: TradingState) -> List[Order]:
     order_depth: OrderDepth = state.order_depths[self.symbol]
     orders: List[Order] = []
-    acceptable_price = self.calculate_value(order_depth, 5)
-
-    if len(order_depth.sell_orders) != 0:
-      best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-      if int(best_ask) < acceptable_price:
-          orders.append(Order(self.symbol, best_ask, -best_ask_amount))
+    window = 100
+    position = state.position.get(self.symbol, 0)
+    z_value, best_ask_value, best_bid_value = self.calculate_z_score(order_depth, window_size=window)
     
-    if len(order_depth.buy_orders) != 0:
-      best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-      if int(best_bid) > acceptable_price:       
-          orders.append(Order(self.symbol, best_bid, -best_bid_amount))
-
+    #This threshold can also be used for tuning the algorithm
+    z_threshold = 4    
+    #Mean Reversion Logic
+    # If price is too low → Buy expecting rebound
+    if z_value < -z_threshold and best_ask_value:
+        volume = min(5, window - position)
+        orders.append(Order(self.symbol, best_ask_value, volume))
+    
+    # If price is too high → Sell expecting drop
+    if z_value > z_threshold and best_bid_value:
+      volume = min(5, position + window)
+      orders.append(Order(self.symbol, best_bid_value, -volume))
+    
     return orders
-  
 
 
 class Trader:
