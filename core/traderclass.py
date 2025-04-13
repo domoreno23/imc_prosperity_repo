@@ -13,8 +13,9 @@ class Basket1():
       self.last_jam = 0
       self.last_croissant = 0
       self.last = 0
+      self.products = None #Stores the references to each product here
 
-    @staticmethod
+    
     def basket1Price(self, state: TradingState):
         order_depth = state.order_depths[self.symbol]
         best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
@@ -28,9 +29,9 @@ class Basket1():
       if any(symbol not in state.order_depths for symbol in ["JAMS, CROISSANTS, DJEMBE"]):
         expectedValue = self.last
       else:
-        jams= Jams.get_mid_price(state.order_depths["JAMS"])
-        croissants = Croissants.get_mid_price(state.order_depths["CROISSANTS"])
-        djembe = Djembe.get_mid_price(state.order_depths["DJEMBE"])
+        jams= self.products["JAMS"].get_mid_price(state.order_depths["JAMS"])
+        croissants = self.products["CROISSANTS"].get_mid_price(state.order_depths["CROISSANTS"])
+        djembe = self.products["DJEMBE"].get_mid_price(state.order_depths["DJEMBE"])
         
 
         expectedValue = croissants*6 + jams*3 + djembe #jamsExpectedValue = basket - 3croissant - djembe
@@ -65,8 +66,9 @@ class Basket2():
       self.symbol = symbol
       self.limit = limit
       self.last_price = 0
+      self.products = None #Stores the references to each product here
       
-    @staticmethod
+   
     def basket2Price(self, state: TradingState):
         order_depth = state.order_depths[self.symbol]
         best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
@@ -79,8 +81,8 @@ class Basket2():
       if any(symbol not in state.order_depths for symbol in ["JAMS, CROISSANTS, DJEMBE"]):
         expectedValue1 = self.last_price
       else:
-        jams= Jams.get_mid_price(state.order_depths["JAMS"])
-        croissants = Croissants.get_mid_price(state.order_depths["CROISSANTS"])
+        jams= self.products["JAMS"].get_mid_price(state.order_depths["JAMS"])
+        croissants = self.products["CROISSANTS"].get_mid_price(state.order_depths["CROISSANTS"])
         expectedValue1 = croissants*4 + jams*2
       orders=[]
       order_depth = state.order_depths["PICNIC_BASKET2"]
@@ -103,8 +105,9 @@ class Jams():
       self.limit = limit
       self.last_croissant = 0
       self.last_djembe = 0
+      self.products = None
     
-    def get_mid_price(self, state: TradingState, order_depth: OrderDepth):
+    def get_mid_price(self, order_depth: OrderDepth):
         
         best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
         best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else None
@@ -114,13 +117,18 @@ class Jams():
     
     
     def run(self, state:TradingState):
-      croissants = self.last_croissant if "CROISSANTS" not in state.order_depths else Croissants.get_mid_price(state.order_depths["CROISSANTS"])
-      djembe = self.last_djembe if "DJEMBE" not in state.order_depths else Djembe.get_mid_price(state.order_depths["DJEMBE"])
+      croissants = (self.last_croissant if "CROISSANTS" not in state.order_depths 
+                    else self.products["CROISSANTS"].get_mid_price(state.order_depths["CROISSANTS"]))
+      djembe = (self.last_djembe if "DJEMBE" not in state.order_depths 
+                else self.products["DJEMBE"].get_mid_price(state.order_depths["DJEMBE"]))
       
-      expectedValue1 = (-6*croissants + -djembe+ Basket1.basket1Price(state))/3
-      expectedValue2 = (Basket2.basket2Price(state) - croissants*4)/2
+      expectedValue1 = (-6*croissants + -djembe+ self.products["PICNIC_BASKET1"].basket1Price(state))/3
+      expectedValue2 = (self.products["PICNIC_BASKET2"].basket2Price(state) - croissants*4)/2
       
       orders = []#Submitted Orders
+
+      #print("Expected Value: ", expectedValue1, "\n")
+      
       
       order_depth = state.order_depths[self.symbol] 
       #For expected Value 1 from first basket  
@@ -134,16 +142,7 @@ class Jams():
         if int(best_bid) > expectedValue1:       
             orders.append(Order(self.symbol, best_bid, -best_bid_amount))
       
-      #For expected Value 2 from second basket
-      if len(order_depth.sell_orders) != 0:
-        best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-        if int(best_ask) < expectedValue2:
-            orders.append(Order(self.symbol, best_ask, -best_ask_amount))
       
-      if len(order_depth.buy_orders) != 0:
-        best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-        if int(best_bid) > expectedValue2:       
-            orders.append(Order(self.symbol, best_bid, -best_bid_amount))
 
       self.last_croissant = croissants
       self.last_djembe = djembe
@@ -156,6 +155,7 @@ class Croissants():
       self.symbol = symbol
       self.limit = limit
       self.last_basket1 = 0
+      self.products = None
 
     def get_mid_price(self, order_depth: OrderDepth):
         best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
@@ -166,7 +166,8 @@ class Croissants():
     def run(self, state: TradingState):
       
       order_depth = state.order_depths[self.symbol]
-      expected_value1 = self.last_basket1 if "PICNIC_BASKET1" not in state.order_depths else .1 * Basket1.basket1Price(state)
+      expected_value1 = (self.last_basket1 if "PICNIC_BASKET1" not in state.order_depths 
+                         else .1 * self.products["PICNIC_BASKET1"].basket1Price(state))
       
       orders = []
       acceptable_price = expected_value1
@@ -180,18 +181,7 @@ class Croissants():
           if int(best_bid) > acceptable_price:       
               orders.append(Order(self.symbol, best_bid, -best_bid_amount))
 
-      expected_value2 = (1/6) * Basket2.basket2Price(state)
-      acceptable_price = expected_value2
-      if len(order_depth.sell_orders) != 0:
-        best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-        if int(best_ask) < acceptable_price:
-            orders.append(Order(self.symbol, best_ask, -best_ask_amount))
-        
-      if len(order_depth.buy_orders) != 0:
-          best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-          if int(best_bid) > acceptable_price:       
-              orders.append(Order(self.symbol, best_bid, -best_bid_amount))
-
+     
       self.last_basket1 = expected_value1
       return orders
 
@@ -204,6 +194,7 @@ class Djembe():
       self.limit = limit
       self.last_croissant = 0
       self.last_djembe = 0
+      self.products = None
 
   def get_mid_price(self, order_depth: OrderDepth):
     best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
@@ -213,8 +204,8 @@ class Djembe():
   
 
   def run(self, state: TradingState):
-    croissants = self.last_croissant if "CROISSANTS" not in state.order_depths else Croissants.get_mid_price(state.order_depths["CROISSANTS"])
-    djembe = self.last_djembe if "DJEMBE" not in state.order_depths else Djembe.get_mid_price(state.order_depths["DJEMBE"])
+    croissants = self.last_croissant if "CROISSANTS" not in state.order_depths else self.products["CROISSANTS"].get_mid_price(state.order_depths["CROISSANTS"])
+    djembe = self.last_djembe if "DJEMBE" not in state.order_depths else self.products["DJEMBE"].get_mid_price(state.order_depths["DJEMBE"])
     expectedValue = .1 * Basket1.basket1Price(state)
       
     orders = []
@@ -387,15 +378,23 @@ class Trader:
         "PICNIC_BASKET2": Basket2("PICNIC_BASKET2", 100)
       }
 
+
+      self.strategies["PICNIC_BASKET1"].products = self.strategies
+      self.strategies["PICNIC_BASKET2"].products = self.strategies
+      self.strategies["JAMS"].products = self.strategies
+      self.strategies["CROISSANTS"].products = self.strategies
+      self.strategies["DJEMBE"].products = self.strategies
+
       self.trader_data = {}  #storing state between rounds
 
     def run(self, state: TradingState):
-        print("traderData: " + state.traderData)
-        print("Observations: " + str(state.observations))
+        print(state.position)
         result = {}
 
         #For each product, check if product is in orderDepth. If so run strategy
         for product, strategy in self.strategies.items():
+            if product in ["JAMS", "CROISSANTS"]:
+               continue
             if product in state.order_depths:
               try:
                   orders = strategy.run(state=state)
