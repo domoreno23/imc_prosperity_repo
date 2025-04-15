@@ -296,12 +296,14 @@ class RainForestResin():
       best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
       if int(best_ask) < acceptable_price:
           orders.append(Order(self.symbol, best_ask, -best_ask_amount))
+          orders.append(Order(self.symbol, 9992, 25))
           
     
     if len(order_depth.buy_orders) != 0:
       best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
       if int(best_bid) > acceptable_price:       
           orders.append(Order(self.symbol, best_bid, -best_bid_amount))
+          orders.append(Order(self.symbol, 10008, -25))
           
     return orders
 
