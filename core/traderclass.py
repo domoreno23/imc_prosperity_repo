@@ -3,7 +3,109 @@ from typing import Dict, List
 import numpy as np
 import string
 import json
+from statistics import NormalDist
 from collections import deque
+
+
+def trade(state:TradingState, symbol: string, is_buy_orders: bool, orders: list[Order], acceptable_price: int):
+  
+  order_depth = state.order_depths[symbol]  
+
+  if is_buy_orders:
+      if len(order_depth.buy_orders) != 0:
+        best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
+        if int(best_bid) > acceptable_price:       
+            orders.append(Order(symbol, best_bid, -best_bid_amount))
+
+  else:
+    if len(order_depth.sell_orders) != 0:
+          best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
+          if int(best_ask) < acceptable_price:
+              orders.append(Order(symbol, best_ask, -best_ask_amount))
+
+
+#trade(state, self.symbol, t/f, orders, acceptable_price)
+
+#take marketprice-theoritcal, which underprices is alot buy that
+
+
+class VolcanicVoucher:
+    def __init__(self, symbol: str, strike_price: float, expiry_days: int, limit: int):
+        self.symbol = symbol
+        self.strike_price = strike_price
+        self.expiry_days = expiry_days
+        self.limit = limit
+        self.vol_window = 20
+        self.vol_history = []
+
+    def black_scholes_call(self, S, K, T, sigma, r=0.0):
+        """Black-Scholes European call option price"""
+        if sigma == 0 or T == 0:
+            return max(0, S - K)
+        N = NormalDist().cdf
+        d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
+        d2 = d1 - sigma * np.sqrt(T)
+        return S * N(d1) - K * np.exp(-r * T) * N(d2)
+        
+
+    def get_mid_price(self, order_depth: OrderDepth):
+        best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
+        best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else None
+        if best_bid and best_ask:
+            return (best_bid + best_ask) / 2
+        return None
+
+    def estimate_volatility(self):
+        returns = np.diff(np.log(self.vol_history))
+        return np.std(returns) * np.sqrt(252) if len(returns) > 1 else 0.0
+
+    def run(self, state: TradingState) -> List[Order]:
+        orders = []
+
+        if ("VOLCANIC_ROCK" not in state.order_depths) or (len(state.order_depths["VOLCANIC_ROCK"] == 0) and
+            len(state.order_depth["VOLCANIC_ROCK"]) == 0):
+          return
+        
+        rock_depth = state.order_depths["VOLCANIC_ROCK"]
+        voucher_depth = state.order_depths[self.symbol]
+           
+        S = self.get_mid_price(rock_depth)
+        V = self.get_mid_price(voucher_depth)
+
+        if S is None or V is None:
+            return []
+
+        # Update volatility estimate
+        self.vol_history.append(S)
+        if len(self.vol_history) > self.vol_window:
+            self.vol_history.pop(0)
+
+        sigma = self.estimate_volatility()
+
+        # Time to expiration in years (e.g., 7 days = 7/252)
+        T = self.expiry_days / 252.0
+
+        # Compute theoretical value
+        theoretical_value = self.black_scholes_call(S, self.strike_price, T, sigma)
+
+        # Get market quotes
+        best_ask, ask_vol = list(voucher_depth.sell_orders.items())[0] if voucher_depth.sell_orders else (None, None)
+        best_bid, bid_vol = list(voucher_depth.buy_orders.items())[0] if voucher_depth.buy_orders else (None, None)
+
+        # Buy undervalued options
+        if best_ask is not None and best_ask < theoretical_value:
+            volume = min(-ask_vol, self.limit)
+            orders.append(Order(self.symbol, best_ask, volume))
+
+        # Sell overvalued options
+        if best_bid is not None and best_bid > theoretical_value:
+            volume = min(bid_vol, self.limit)
+            orders.append(Order(self.symbol, best_bid, -volume))
+
+        print(f"[{self.symbol}] Fair: {theoretical_value:.2f}, Ask: {best_ask}, Bid: {best_bid}, Volatility: {sigma:.4f}")
+
+        return orders
+
 
 
 class Basket1():
@@ -39,23 +141,11 @@ class Basket1():
        ##Croissant Pos size:
        ##jams Position size: 3,6,9,12,15
        #djembe position size: 1,2,3,4,5
-
-      
-
       orders = []
       acceptable_price = expectedValue
-      order_depth = state.order_depths[self.symbol]   
-      if len(order_depth.sell_orders) != 0:
-        best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-       
-        if int(best_ask) < acceptable_price:
-            orders.append(Order(self.symbol, best_ask, -best_ask_amount))
       
-      if len(order_depth.buy_orders) != 0:
-        best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-        if int(best_bid) > acceptable_price:       
-            orders.append(Order(self.symbol, best_bid, -best_bid_amount))
-            
+      trade(state, self.symbol, True, orders, acceptable_price)
+      trade(state, self.symbol, False, orders, acceptable_price)  
       self.last = expectedValue
       return orders
 
@@ -68,7 +158,7 @@ class Basket2():
       self.last_price = 0
       self.products = None #Stores the references to each product here
       
-   
+  
     def basket2Price(self, state: TradingState):
         order_depth = state.order_depths[self.symbol]
         best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
@@ -85,17 +175,11 @@ class Basket2():
         croissants = self.products["CROISSANTS"].get_mid_price(state.order_depths["CROISSANTS"])
         expectedValue1 = croissants*4 + jams*2
       orders=[]
-      order_depth = state.order_depths["PICNIC_BASKET2"]
+     
 
-      if len(order_depth.sell_orders) != 0:
-        best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-        if int(best_ask) < expectedValue1:
-            orders.append(Order(self.symbol, best_ask, -best_ask_amount))
+      trade(state, self.symbol, True, orders, expectedValue1)
+      trade(state, self.symbol, False, orders, expectedValue1)
       
-      if len(order_depth.buy_orders) != 0:
-        best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-        if int(best_bid) > expectedValue1:       
-            orders.append(Order(self.symbol, best_bid, -best_bid_amount))
       self.last_price = expectedValue1
       return orders
 
@@ -270,15 +354,8 @@ class Kelp():
     order_depth = state.order_depths[self.symbol]
     acceptable_price = self.calculate_value(order_depth, 5)
 
-    if len(order_depth.sell_orders) != 0:
-      best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-      if int(best_ask) < acceptable_price:
-          orders.append(Order(self.symbol, best_ask, -best_ask_amount))
-    
-    if len(order_depth.buy_orders) != 0:
-      best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-      if int(best_bid) > acceptable_price:       
-          orders.append(Order(self.symbol, best_bid, -best_bid_amount))
+    trade(state, self.symbol, True, orders, acceptable_price)
+    trade(state, self.symbol, False, orders, acceptable_price)
   
     return orders
         
@@ -361,6 +438,8 @@ class SquidInk():
       orders.append(Order(self.symbol, best_bid_value, -volume))
     
     return orders
+  
+
 
 
 class Trader:
@@ -375,7 +454,12 @@ class Trader:
         "CROISSANTS": Croissants("CROISSANTS", 250),
         "JAMS": Jams("JAMS", 350),
         "DJEMBE": Djembe("DJEMBE", 60),
-        "PICNIC_BASKET2": Basket2("PICNIC_BASKET2", 100)
+        "PICNIC_BASKET2": Basket2("PICNIC_BASKET2", 100), 
+        "VOLCANIC_ROCK_VOUCHER_9500": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_9500", 9500, expiry_days=7, limit=200),
+        "VOLCANIC_ROCK_VOUCHER_9750": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_9750", 9750, expiry_days=7, limit=200),
+        "VOLCANIC_ROCK_VOUCHER_10000": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_10000", 10000, expiry_days=7, limit=200),
+        "VOLCANIC_ROCK_VOUCHER_10250": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_10250", 10250, expiry_days=7, limit=200),
+        "VOLCANIC_ROCK_VOUCHER_10500": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_10500", 10500, expiry_days=7, limit=200),
       }
 
 
