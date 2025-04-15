@@ -28,6 +28,19 @@ def trade(state:TradingState, symbol: string, is_buy_orders: bool, orders: list[
 
 #take marketprice-theoritcal, which underprices is alot buy that
 
+class VolcanicRock():
+  def __init__(self, symbol: str, limit: int):
+    self.symbol = symbol
+    self.limit = limit
+    
+    ##Need to add logic to buy using Vouchers
+    
+  def run(self, state: TradingState) -> List[Order]:
+    orders=[]
+    
+    return orders
+
+
 
 class VolcanicVoucher:
     def __init__(self, symbol: str, strike_price: float, expiry_days: int, limit: int):
@@ -68,7 +81,7 @@ class VolcanicVoucher:
         
         rock_depth = state.order_depths["VOLCANIC_ROCK"]
         voucher_depth = state.order_depths[self.symbol]
-           
+          
         S = self.get_mid_price(rock_depth)
         V = self.get_mid_price(voucher_depth)
 
