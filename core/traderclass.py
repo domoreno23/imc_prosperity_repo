@@ -7,6 +7,60 @@ from statistics import NormalDist
 from collections import deque
 
 ######################
+
+#Global trade function used by any class
+def trade(state:TradingState, symbol: string, is_buy_orders: bool, orders: list[Order], acceptable_price: int):
+  
+  order_depth = state.order_depths[symbol]  
+
+  if is_buy_orders:
+      if len(order_depth.buy_orders) != 0:
+        best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
+        if int(best_bid) > acceptable_price:       
+            orders.append(Order(symbol, best_bid, -best_bid_amount))
+
+  else:
+    if len(order_depth.sell_orders) != 0:
+          best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
+          if int(best_ask) < acceptable_price:
+              orders.append(Order(symbol, best_ask, -best_ask_amount))
+
+
+class MagnificientMacroons():
+  def __init__(self, symbol: str, limit: int):
+    self.symbol = symbol
+    self.limit = limit
+    
+  
+  def run(self, state: TradingState):
+    orders = []
+    
+    #Getting all of attributes for the observation
+    observations = state.observations.conversionObservations[self.symbol]
+    sunlight = observations.sunlightIndex
+    sugar = observations.sugarPrice
+    transport = observations.transportFees
+    import_tariff = observations.importTariff
+    export_tariff = observations.exportTariff
+    
+    #Calculating faie price value we need to find the WEIGHTS that each attribute holds
+    a, b, c, d, e = 0
+    fair_price = (a * sunlight) + (b * sugar) - (c * transport) - (d * import_tariff) - (e * export_tariff)
+    
+    
+    #Calculcating Midprice
+    depth = state.order_depths[self.symbol]
+    best_bid = max(depth.buy_orders.keys()) if depth.buy_orders else None
+    best_ask = min(depth.sell_orders.keys()) if depth.sell_orders else None
+    mid_price = (best_bid + best_ask) / 2 if best_bid and best_ask else None
+
+    
+    
+    return orders
+
+
+
+
 class Croissants():
     def __init__(self, symbol: str, limit: int):
       self.symbol = symbol
@@ -19,9 +73,6 @@ class Croissants():
         best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else None
         jams_mid_price = (best_bid + best_ask) / 2 if best_bid and best_ask else None
         return jams_mid_price
-    
-
-
     
     def run(self, state: TradingState):
 
@@ -37,11 +88,7 @@ class Croissants():
          orders.append(Order(self.symbol, best_bid, -10))
       if best_ask < expectedValue:
          orders.append(Order(self.symbol, best_ask, 10))
-      
-      
-      
-      
-
+    
       return orders
 
 
@@ -72,35 +119,16 @@ class Jams():
       if best_ask < expectedValue:
          orders.append(Order(self.symbol, best_ask, 10))
       
-
-
       return orders
-
-
-############################
-
-
-
-def trade(state:TradingState, symbol: string, is_buy_orders: bool, orders: list[Order], acceptable_price: int):
-  
-  order_depth = state.order_depths[symbol]  
-
-  if is_buy_orders:
-      if len(order_depth.buy_orders) != 0:
-        best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-        if int(best_bid) > acceptable_price:       
-            orders.append(Order(symbol, best_bid, -best_bid_amount))
-
-  else:
-    if len(order_depth.sell_orders) != 0:
-          best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-          if int(best_ask) < acceptable_price:
-              orders.append(Order(symbol, best_ask, -best_ask_amount))
 
 
 #trade(state, self.symbol, t/f, orders, acceptable_price)
 
 #take marketprice-theoritcal, which underprices is alot buy that
+
+#SUM UP POSITIONS AND TAKE THE OPPOSTITE OF THAT (BUY/SHORT) AND DO THAT
+
+#Carlos will solve this
 '''
 class VolcanicRock():
   def __init__(self, symbol: str, limit: int):
@@ -166,8 +194,6 @@ class VolcanicVoucher():
         if ("VOLCANIC_ROCK" not in state.order_depths or len(state.order_depths["VOLCANIC_ROCK"].buy_orders) == 0 or 
             len(state.order_depths["VOLCANIC_ROCK"].sell_orders) == 0):
           return
-
-      
         
         rock_depth = state.order_depths["VOLCANIC_ROCK"]
         voucher_depth = state.order_depths[self.symbol]
@@ -213,9 +239,7 @@ class VolcanicVoucher():
         #print(f"[{self.symbol}] Fair: {theoretical_value:.2f}, Ask: {best_ask}, Bid: {best_bid}, Volatility: {sigma:.4f}")
 
         return orders
-
-
-
+    
 class Basket1():
     def __init__(self, symbol: str, limit: int):
       self.symbol = symbol
@@ -256,9 +280,7 @@ class Basket1():
       trade(state, self.symbol, False, orders, acceptable_price)  
       self.last = expectedValue
       return orders
-
-
-
+    
 class Basket2():
     def __init__(self, symbol: str, limit: int):
       self.symbol = symbol
@@ -290,101 +312,6 @@ class Basket2():
       
       self.last_price = expectedValue1
       return orders
-
-
-'''
-class Jams():
-    def __init__(self, symbol: str, limit: int):
-      self.symbol = symbol
-      self.limit = limit
-      self.last_croissant = 0
-      self.last_djembe = 0
-      self.products = None
-    
-    def get_mid_price(self, order_depth: OrderDepth):
-        
-        best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
-        best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else None
-        jams_mid_price = (best_bid + best_ask) / 2 if best_bid and best_ask else None
-        return jams_mid_price
-    
-    
-    
-    def run(self, state:TradingState):
-      croissants = (self.last_croissant if "CROISSANTS" not in state.order_depths 
-                    else self.products["CROISSANTS"].get_mid_price(state.order_depths["CROISSANTS"]))
-      djembe = (self.last_djembe if "DJEMBE" not in state.order_depths 
-                else self.products["DJEMBE"].get_mid_price(state.order_depths["DJEMBE"]))
-      
-      expectedValue1 = (-6*croissants + -djembe+ self.products["PICNIC_BASKET1"].basket1Price(state))/3
-      expectedValue2 = (self.products["PICNIC_BASKET2"].basket2Price(state) - croissants*4)/2
-      
-      orders = []#Submitted Orders
-
-      #print("Expected Value: ", expectedValue1, "\n")
-      
-      
-      order_depth = state.order_depths[self.symbol] 
-      #For expected Value 1 from first basket  
-      if len(order_depth.sell_orders) != 0:
-        best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-        if int(best_ask) < expectedValue1:
-            volume = min(-best_ask_amount, self.limit)
-            orders.append(Order(self.symbol, best_ask, volume))
-      
-      if len(order_depth.buy_orders) != 0:
-        best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-        if int(best_bid) > expectedValue2:       
-            volume = min(best_bid_amount, self.limit)
-            orders.append(Order(self.symbol, best_bid, volume))
-      
-      
-
-      self.last_croissant = croissants
-      self.last_djembe = djembe
-      return orders
-
-
-
-class Croissants():
-    def __init__(self, symbol: str, limit: int):
-      self.symbol = symbol
-      self.limit = limit
-      self.last_basket1 = 0
-      self.products = None
-
-    def get_mid_price(self, order_depth: OrderDepth):
-        best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
-        best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else None
-        croissants_mid_price = (best_bid + best_ask) / 2 if best_bid and best_ask else None
-        return croissants_mid_price
-
-    def run(self, state: TradingState):
-      
-      order_depth = state.order_depths[self.symbol]
-      expected_value1 = (self.last_basket1 if "PICNIC_BASKET1" not in state.order_depths 
-                         else .1 * self.products["PICNIC_BASKET1"].basket1Price(state))
-      
-      orders = []
-      acceptable_price = expected_value1
-      if len(order_depth.sell_orders) != 0:
-        best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-        if int(best_ask) < acceptable_price:
-            volume = min(-best_ask_amount, self.limit)
-            orders.append(Order(self.symbol, best_ask, volume))
-        
-      if len(order_depth.buy_orders) != 0:
-          best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-          if int(best_bid) > acceptable_price:       
-              volume = min(best_ask_amount, self.limit)
-              orders.append(Order(self.symbol, best_bid, volume))
-
-    
-      self.last_basket1 = expected_value1
-      return orders
-
-
-'''
 
 class Djembe():
   def __init__(self,symbol:str, limit: int):
@@ -426,12 +353,6 @@ class Djembe():
     
     
     return orders
-
-      
-    
-
-
-
 
 class Kelp():
   def __init__(self, symbol, limit):
@@ -594,7 +515,7 @@ class Trader:
                 print(f"Error executing strategy for {product}: {str(e)}")
             
                 
-       
+      
   
         trader_data_str = json.dumps(self.trader_data)
         
