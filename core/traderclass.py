@@ -581,7 +581,7 @@ class Trader:
         "KELP": Kelp("KELP", 50),
         "SQUID_INK": SquidInk("SQUID_INK", 50), 
         "PICNIC_BASKET1": Basket1("PICNIC_BASKET1", 60),
-        "CROISSANTS": Croissants("CROISSANTS", 250),
+        #"CROISSANTS": Croissants("CROISSANTS", 250),
         "JAMS": Jams("JAMS", 350),
         "DJEMBE": Djembe("DJEMBE", 60),
         "PICNIC_BASKET2": Basket2("PICNIC_BASKET2", 100), 
