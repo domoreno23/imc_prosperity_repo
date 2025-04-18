@@ -31,6 +31,8 @@ class MagnificientMacroons:
         self.symbol = symbol
         self.limit = limit
         self.data = []
+        self.sunlight_window = deque(maxlen=100) #Last 100 sunlight scores
+        self.csi = 55 #critical sunlight index
 
     def run(self, state: TradingState):
         orders = []
@@ -48,11 +50,24 @@ class MagnificientMacroons:
         transport = obs.transportFees
         import_tariff = obs.importTariff
         export_tariff = obs.exportTariff
+        
+        #Sunlight history
+        self.sunlight_window.append(sunlight)
+        low_sunlight_count = sum(s < self.csi for s in self.sunlight_window)
+        low_sunlight_ratio = low_sunlight_count / len(self.sunlight_window)
+
 
         
         #Used ML model to compute the coefficients and intercept locally
         a, b, c, d, e = -0.74460938, 12.62199989,  36.16015896, -31.11214568,  26.93065467
-        fair_price = -2286.778291436136 + (a * sunlight) + (b * sugar) + (c * transport) + (d * import_tariff) + (e * export_tariff)
+        base_fair_price = -2286.778291436136 + (a * sunlight) + (b * sugar) + (c * transport) + (d * import_tariff) + (e * export_tariff)
+        
+        if low_sunlight_ratio >= 0.7:
+            # If more than 70% of last 10 ticks are under CSI → panic pricing expected
+            panic_multiplier = 1.15  # or try 1.15, depending on historical uplift
+            fair_price = base_fair_price * panic_multiplier
+        else:
+            fair_price = base_fair_price
         
         # === Position logic ===
         position = state.position.get(self.symbol, 0)
