@@ -592,6 +592,7 @@ class Trader:
         "VOLCANIC_ROCK_VOUCHER_10000": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_10000", 10000, expiry_days=5, limit=200),
         "VOLCANIC_ROCK_VOUCHER_10250": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_10250", 10250, expiry_days=5, limit=200),
         "VOLCANIC_ROCK_VOUCHER_10500": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_10500", 10500, expiry_days=5, limit=200),
+        "VOLCANIC_ROCK": VolcanicRock("VOLCANIC_ROCK", limit = 400),
         "MAGNIFICENT_MACARONS": MagnificientMacroons("MAGNIFICENT_MACARONS",75)
       }
 
