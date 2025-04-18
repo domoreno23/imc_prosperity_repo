@@ -8,6 +8,8 @@ from collections import deque
 import pandas as pd
 ######################
 
+
+
 #Global trade function used by any class
 def trade(state:TradingState, symbol: string, is_buy_orders: bool, orders: list[Order], acceptable_price: int):
   
@@ -159,32 +161,98 @@ class Jams():
 #SUM UP POSITIONS AND TAKE THE OPPOSTITE OF THAT (BUY/SHORT) AND DO THAT
 
 #Carlos will solve this
-'''
+
 class VolcanicRock():
   def __init__(self, symbol: str, limit: int):
     self.symbol = symbol
     self.limit = limit
+    self.vol_history = []
+    self.vol_window = 20
+    self.vouchers = {
+       "VOLCANIC_ROCK_VOUCHER_9500": 9500,
+        "VOLCANIC_ROCK_VOUCHER_9750": 9750, 
+        "VOLCANIC_ROCK_VOUCHER_10000": 10000,
+        "VOLCANIC_ROCK_VOUCHER_10250": 10250
+    }
+    self.min_volatility = 0.20
+    
+
+  def get_mid_price(self, order_depth: OrderDepth):
+        best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
+        best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else None
+        if best_bid and best_ask:
+            return (best_bid + best_ask) / 2
+        return None
+  
+
+  def calculate_delta(self, S: float, K: float, T: float, sigma: float):
+        try:
+            if sigma <= 0 or T <= 0 or S <= 0 or K <= 0:
+                return 0.0
+            sigma = max(sigma, self.min_volatility)
+            
+            d1 = (np.log(S/K) + (0.5*sigma**2)*T) / (sigma*np.sqrt(T))
+            return NormalDist().cdf(d1)
+        except:
+            return 0.0  # Fallback if calculation fails
+
+    
+
+
+  def estimate_volatility(self):
+        if len(self.vol_history) < 2:
+          return 0.20
+        returns = np.diff(np.log(self.vol_history))
+        return np.std(returns) * np.sqrt(252) if len(returns) > 1 else 0.0
     
   def run(self, state: TradingState) -> List[Order]:
-    orders=[]
-  
-    real price - theoretical price (needs to be found for every voucher)
-    Check position of the voucher
-    Add a position to offset it
-    Buy the underpriced call and sell the overpriced call
-    Ex: if: long 1 9750 voucher
-    long 1 10000voucher
-    then short 2 volcanic rock
-    
-    
-    
-  def long(self, state: TradingState):
-    order_depth = state.order_depths[self.symbol]
-    price = min(order_depth.sell_orders.keys())
-    position = state.position.get(self.symbol, 0)
-    
+    #Potentially, everytime a voucher is run, i run this class, and i check the position of this classs
+
+    orders = []
+
+    rock_mid_price = self.get_mid_price(state.order_depths[self.symbol])
+
+    self.vol_history.append(rock_mid_price)
+    if len(self.vol_history) > self.vol_window:
+            self.vol_history.pop(0)
+
+    sigma = self.estimate_volatility()
+    T = 5
+    sum_delta = 0
+
+    rock_depth = state.order_depths[self.symbol]
+    for voucher, strike_price in self.vouchers.items():
+      if voucher in state.order_depths:
+        delta = self.calculate_delta(rock_mid_price, strike_price, T, sigma )
+        sum_delta += state.position.get(voucher, 0) * delta
+
+    req_rock_position = -round(sum_delta)
+    current_rock_position = state.position.get(self.symbol, 0)
+
+    position_diff = req_rock_position - current_rock_position
+
+    if position_diff > 0:
+            # Need to buy rock
+            best_ask, best_ask_vol = next(iter(rock_depth.sell_orders.items()), (None, None))
+            if best_ask:
+                volume = min(position_diff, best_ask_vol, self.limit - current_rock_position)
+                orders.append(Order(self.symbol, best_ask, volume))
+    elif position_diff < 0:
+            # Need to sell rock
+            best_bid, best_bid_vol = next(iter(rock_depth.buy_orders.items()), (None, None))
+            if best_bid:
+                volume = max(position_diff, -best_bid_vol, -self.limit - current_rock_position)
+                orders.append(Order(self.symbol, best_bid, volume))
+
     return orders
-'''
+
+         
+    
+    
+    
+ 
+  
+
 
 
 
@@ -230,6 +298,8 @@ class VolcanicVoucher():
           
         rock_mid_price = self.get_mid_price(rock_depth)
         voucher_mid_price = self.get_mid_price(voucher_depth)
+
+        #print(rock_mid_price)
 
         if rock_mid_price is None or voucher_mid_price is None:
             return []
@@ -520,6 +590,7 @@ class Trader:
         "VOLCANIC_ROCK_VOUCHER_10000": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_10000", 10000, expiry_days=5, limit=200),
         "VOLCANIC_ROCK_VOUCHER_10250": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_10250", 10250, expiry_days=5, limit=200),
         "VOLCANIC_ROCK_VOUCHER_10500": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_10500", 10500, expiry_days=5, limit=200),
+        "VOLCANIC_ROCK": VolcanicRock("VOLCANIC_ROCK", limit = 400),
         "MAGNIFICENT_MACARONS": MagnificientMacroons("MAGNIFICENT_MACARONS",75)
       }
 
@@ -527,16 +598,21 @@ class Trader:
       for product in self.strategies:
             if hasattr(self.strategies[product], "products"):
                 self.strategies[product].products = self.strategies
+            
+
+      
 
       self.trader_data = {}  #storing state between rounds
 
     def run(self, state: TradingState):
-        print(state.position)
         result = {}
+        conversions = 0
+
+        old_trader_data = json.loads(state.traderData) if state.traderData != "" else {}
+        new_trader_data = {}
 
         #For each product, check if product is in orderDepth. If so run strategy
         for product, strategy in self.strategies.items():
-            
             if product in state.order_depths:
               try:
                   orders = strategy.run(state=state)
