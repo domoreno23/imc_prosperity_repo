@@ -89,4 +89,4 @@ def show_data(file, product_name):
     plt.show()
 
 
-show_data("/Users/damianmoreno/imc_prosperity/data/prices_day1/merged_price_day_1_data.csv", "SQUID_INK")
+show_data("/Users/damianmoreno/imc_prosperity/data/prices_round4/prices_round_4_day_1.csv", "MAGNIFICENT_MACARONS")

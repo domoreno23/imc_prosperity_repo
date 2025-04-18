@@ -5,7 +5,7 @@ import string
 import json
 from statistics import NormalDist
 from collections import deque
-
+import pandas as pd
 ######################
 
 #Global trade function used by any class
@@ -26,37 +26,54 @@ def trade(state:TradingState, symbol: string, is_buy_orders: bool, orders: list[
               orders.append(Order(symbol, best_ask, -best_ask_amount))
 
 
-class MagnificientMacroons():
-  def __init__(self, symbol: str, limit: int):
-    self.symbol = symbol
-    self.limit = limit
-    
-  
-  def run(self, state: TradingState):
-    orders = []
-    
-    #Getting all of attributes for the observation
-    observations = state.observations.conversionObservations[self.symbol]
-    sunlight = observations.sunlightIndex
-    sugar = observations.sugarPrice
-    transport = observations.transportFees
-    import_tariff = observations.importTariff
-    export_tariff = observations.exportTariff
-    
-    #Calculating faie price value we need to find the WEIGHTS that each attribute holds
-    a, b, c, d, e = 0
-    fair_price = (a * sunlight) + (b * sugar) - (c * transport) - (d * import_tariff) - (e * export_tariff)
-    
-    
-    #Calculcating Midprice
-    depth = state.order_depths[self.symbol]
-    best_bid = max(depth.buy_orders.keys()) if depth.buy_orders else None
-    best_ask = min(depth.sell_orders.keys()) if depth.sell_orders else None
-    mid_price = (best_bid + best_ask) / 2 if best_bid and best_ask else None
+class MagnificientMacroons:
+    def __init__(self, symbol: str, limit: int):
+        self.symbol = symbol
+        self.limit = limit
+        self.data = []
 
-    
-    
-    return orders
+    def run(self, state: TradingState):
+        orders = []
+
+        # Get order book
+        depth = state.order_depths[self.symbol]
+        best_bid, best_bid_amount = list(depth.buy_orders.items())[0]
+        best_ask, best_ask_amount = list(depth.sell_orders.items())[0]
+        macaron_mid_price = (best_bid + best_ask) / 2
+
+        # Get features
+        obs = state.observations.conversionObservations[self.symbol]
+        sunlight = obs.sunlightIndex
+        sugar = obs.sugarPrice
+        transport = obs.transportFees
+        import_tariff = obs.importTariff
+        export_tariff = obs.exportTariff
+
+        
+        #Used ML model to compute the coefficients and intercept locally
+        a, b, c, d, e = -0.74460938, 12.62199989,  36.16015896, -31.11214568,  26.93065467
+        fair_price = -2286.778291436136 + (a * sunlight) + (b * sugar) + (c * transport) + (d * import_tariff) + (e * export_tariff)
+        
+        # === Position logic ===
+        position = state.position.get(self.symbol, 0)
+        max_buy = self.limit - position
+        max_sell = self.limit + position
+
+        
+
+        if fair_price > best_ask:
+            volume = min(max_buy, best_ask_amount)
+            if volume > 0:
+                orders.append(Order(self.symbol, best_ask, -volume))
+
+        if fair_price < best_bid:
+            volume = min(max_sell, best_bid_amount)
+            if volume > 0:
+                orders.append(Order(self.symbol, best_bid, volume))
+
+        return orders
+
+
 
 
 
@@ -227,14 +244,14 @@ class VolcanicVoucher():
         if best_ask is not None and best_ask < theoretical_value:
             #volume = min(ask_vol, self.limit)
             orders.append(Order(self.symbol, best_ask, -15))
-            orders.append(Order("VOLCANIC_ROCK", best_rock_ask, 15))
-          #30 is best
+            #orders.append(Order("VOLCANIC_ROCK", best_rock_ask, 15))
+          
 
         # Sell overvalued options
         if best_bid is not None and best_bid > theoretical_value:
             #volume = min(bid_vol, self.limit)
             orders.append(Order(self.symbol, best_bid, -15))
-            orders.append(Order("VOLCANIC_ROCK", best_rock_bid, 15))
+            #orders.append(Order("VOLCANIC_ROCK", best_rock_bid, 15))
 
         #print(f"[{self.symbol}] Fair: {theoretical_value:.2f}, Ask: {best_ask}, Bid: {best_bid}, Volatility: {sigma:.4f}")
 
@@ -305,8 +322,7 @@ class Basket2():
         croissants = self.products["CROISSANTS"].get_mid_price(state.order_depths["CROISSANTS"])
         expectedValue1 = croissants*4 + jams*2
       orders=[]
-     
-
+    
       trade(state, self.symbol, True, orders, expectedValue1)
       trade(state, self.symbol, False, orders, expectedValue1)
       
@@ -346,7 +362,7 @@ class Djembe():
         best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
         if int(best_bid) > acceptable_price:
             volume = min(best_ask_amount, self.limit)
-            orders.append(Order(self.symbol, best_bid, -best_bid_amount))
+            orders.append(Order(self.symbol, best_bid, volume))
     
     self.last_croissant = croissants
     self.last_djembe = djembe
@@ -450,12 +466,12 @@ class SquidInk():
   def run(self, state: TradingState) -> List[Order]:
     order_depth: OrderDepth = state.order_depths[self.symbol]
     orders: List[Order] = []
-    window = 100
+    window = 101
     position = state.position.get(self.symbol, 0)
     z_value, best_ask_value, best_bid_value = self.calculate_z_score(order_depth, window_size=window)
     
     #This threshold can also be used for tuning the algorithm
-    z_threshold = 4 
+    z_threshold = 3 
     
     #Mean Reversion Logic
     # If price is too low → Buy expecting rebound
@@ -491,6 +507,7 @@ class Trader:
         "VOLCANIC_ROCK_VOUCHER_10000": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_10000", 10000, expiry_days=5, limit=200),
         "VOLCANIC_ROCK_VOUCHER_10250": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_10250", 10250, expiry_days=5, limit=200),
         "VOLCANIC_ROCK_VOUCHER_10500": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_10500", 10500, expiry_days=5, limit=200),
+        "MAGNIFICENT_MACARONS": MagnificientMacroons("MAGNIFICENT_MACARONS",75)
       }
 
 

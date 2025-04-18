@@ -22,5 +22,5 @@ def merge_csv_files(directory, output_file):
 
 # Example usage:
 directory_path = r"/Users/damianmoreno/imc_prosperity/data/prices_day1"  # Replace with the actual path
-output_filename = "merged_price_day_1_data.csv"
+output_filename = "merged_round_4_data.csv"
 merge_csv_files(directory_path, output_filename)

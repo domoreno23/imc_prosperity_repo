@@ -1,8 +1,8 @@
 """
-This script allows you to input a MERGED CSV for a given round and get a pandas dataframe of only one inputted asset
+This script allows you to input a CSV for a given round and get a CSV file back of only one inputted asset
 EX:
 get_asset(merged_price_day_1_data.csv, "KELP")
-The command above would provide you with a pandas dataframe for only kelp
+The command above would provide you with a CSV file for only kelp
 
 NOTE: this currently does not give you a fully clean csv file just yet
 
@@ -12,10 +12,10 @@ asset (str): desired asset
 """
 import pandas as pd
 
-def get_asset(merged_file, asset):
-  df = pd.read_csv(merged_file, delimiter=';')
+def get_asset(file, asset):
+  df = pd.read_csv(file, delimiter=';')
   filter_asset = df['product'] == asset
   asset_df = df[filter_asset]
-  return asset_df
+  asset_df.to_csv("macarons.csv")
 
-print(get_asset(merged_file="/Users/damianmoreno/imc_prosperity/data/prices_day1/merged_price_day_1_data.csv", asset="KELP"))
+get_asset(file="", asset="MAGNIFICENT_MACARONS")
