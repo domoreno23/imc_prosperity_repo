@@ -52,7 +52,7 @@ def get_product_prices(prices: pd.DataFrame, product: str) -> np.ndarray:
     return np.array(mid_prices)
 
 
-days = [[3, [2]], [4, [2, 3]]]
+days = [[3, [2]], [4, [2, 3]], [5, [2, 3, 4]]]
 
 traders = [
     "Amir", "Ayumi", "Ari", "Anika", "Boris", "Bashir",
@@ -75,7 +75,7 @@ for day_num in trader_days:
 traders = sorted(traders)
 print(traders)
 
-
+'''''
 for round_num, day_nums in days:
     prices = pd.DataFrame()
     trades = pd.DataFrame()
@@ -115,6 +115,51 @@ for round_num, day_nums in days:
                     y=trader_trades["price"],
                     mode="markers",
                     name=f"{buyer}/{seller}",
+                    visible="legendonly",
+                    line={"color": colors.generate()[0]},
+                ))
+
+        fig.update_layout(title_text=f"Round {round_num} - {product}")
+        fig.show()
+        '''''
+
+
+for round_num, day_nums in days:
+    prices = pd.DataFrame()
+    trades = pd.DataFrame()
+
+    for day_num in day_nums:
+        if len(prices) == 0:
+            timestamp_offset = 0
+        else:
+            timestamp_offset = int(prices["timestamp"].tail(1).iloc[0])
+
+        day_prices = get_prices(round_num, day_num)
+        day_trades = get_trades(day_num)
+
+        day_prices["timestamp"] += timestamp_offset
+        day_trades["timestamp"] += timestamp_offset
+
+        prices = pd.concat([prices, day_prices])
+        trades = pd.concat([trades, day_trades])
+
+    for product in sorted(prices["product"].unique()):
+        product_prices = get_product_prices(prices, product)
+        product_trades = trades[trades["symbol"] == product]
+
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        fig.add_trace(go.Scatter(x=prices[prices["product"] == product]["timestamp"], y=product_prices, name="Price", line={"color": "gray"}))
+
+        colors = RandomColor(seed=0)
+
+        for trader in traders:
+            for side in ["buyer", "seller"]:
+                trader_trades = product_trades[product_trades[side] == trader]
+                fig.add_trace(go.Scatter(
+                    x=trader_trades["timestamp"],
+                    y=trader_trades["price"],
+                    mode="markers",
+                    name=f"{side} = {trader}",
                     visible="legendonly",
                     line={"color": colors.generate()[0]},
                 ))

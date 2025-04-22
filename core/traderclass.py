@@ -9,6 +9,80 @@ import pandas as pd
 ######################
 
 
+class MarketMakeStrategy():
+  def __init__(self, symbol: string, limit: int):
+     self.symbol = symbol
+     self.limit = limit
+     self.window_size = 20
+     self.window = deque()
+     
+     
+
+  def market_make(self, state: TradingState, true_value: int):
+      orders = []
+      order_depth = state.order_depths[self.symbol]
+      buy_orders = sorted(order_depth.buy_orders.items(), reverse=True)
+      sell_orders = sorted(order_depth.sell_orders.items())
+
+      position = state.position.get(self.symbol, 0)
+      to_buy = self.limit - position
+      to_sell = self.limit + position
+
+      self.window.append(abs(position) == self.limit)
+      if len(self.window) > self.window_size:
+          self.window.popleft()
+
+      soft_liquidate = len(self.window) == self.window_size and sum(self.window) >= self.window_size / 2 and self.window[-1]
+      hard_liquidate = len(self.window) == self.window_size and all(self.window)
+
+      max_buy_price = true_value - 1 if position > self.limit * 0.5 else true_value
+      min_sell_price = true_value + 1 if position < self.limit * -0.5 else true_value
+
+      for price, volume in sell_orders:
+          if to_buy > 0 and price <= max_buy_price:
+              quantity = min(to_buy, -volume)
+              orders.append(Order(self.symbol, price, quantity))
+              to_buy -= quantity
+
+      if to_buy > 0 and hard_liquidate:
+          quantity = to_buy // 2
+          orders.append(Order(self.symbol, true_value, quantity))
+          to_buy -= quantity
+
+      if to_buy > 0 and soft_liquidate:
+          quantity = to_buy // 2
+          orders.append(Order(self.symbol, true_value-2, quantity))
+          to_buy -= quantity
+
+      if to_buy > 0:
+          popular_buy_price = max(buy_orders, key=lambda tup: tup[1])[0]
+          price = min(max_buy_price, popular_buy_price + 1)
+          orders.append(Order(self.symbol, price, to_buy))
+
+      for price, volume in buy_orders:
+          if to_sell > 0 and price >= min_sell_price:
+              quantity = min(to_sell, volume)
+              orders.append(Order(self.symbol, price, -quantity))
+              to_sell -= quantity
+
+      if to_sell > 0 and hard_liquidate:
+          quantity = to_sell // 2
+          orders.append(Order(self.symbol, true_value, -quantity))
+          to_sell -= quantity
+
+      if to_sell > 0 and soft_liquidate:
+          quantity = to_sell // 2
+          orders.append(Order(self.symbol, true_value-2, -quantity))
+          to_sell -= quantity
+
+      if to_sell > 0:
+          popular_sell_price = min(sell_orders, key=lambda tup: tup[1])[0]
+          price = max(min_sell_price, popular_sell_price - 1)
+          orders.append(Order(self.symbol, price, -to_sell))
+  
+      return orders
+
+
 
 #Global trade function used by any class
 def trade(state:TradingState, symbol: string, is_buy_orders: bool, orders: list[Order], acceptable_price: int):
@@ -107,24 +181,27 @@ class Croissants():
         return jams_mid_price
     
     def run(self, state: TradingState):
+      trades = state.market_trades.get(self.symbol, [])
+      trades = [t for t in trades if t.timestamp == state.timestamp - 100]
+      orders = []
+      order_depth = state.order_depths[self.symbol]
+      position = state.position.get(self.symbol, 0)
+      buy_price = min(order_depth.sell_orders.keys())
+      sell_price = max(order_depth.buy_orders.keys())
 
-      
-      orders = []
-      basket1Price = Basket1.basket1Price(self, state)
-      orders = []
-      order_depth = state.order_depths["CROISSANTS"]
-      best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
-      best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else None
-      expectedValue = .1 * basket1Price
-      if best_bid > expectedValue:
-         orders.append(Order(self.symbol, best_bid, -10))
-      if best_ask < expectedValue:
-         orders.append(Order(self.symbol, best_ask, 10))
-    
+      if any(t.buyer == "Caesar" and t.seller == "Olivia" for t in trades):
+         print("helo")
+         orders.append(Order(self.symbol, sell_price, -self.limit + position ))
+
+      if any(t.buyer == "Olivia" and t.seller == "Caesar" for t in trades):
+         
+         orders.append(Order(self.symbol, buy_price, self.limit - position ))
+
       return orders
+      
+    
 
-
-class Jams():
+class Jams(MarketMakeStrategy):
     def __init__(self, symbol: str, limit: int):
       self.symbol = symbol
       self.limit = limit
@@ -145,11 +222,12 @@ class Jams():
       order_depth = state.order_depths["JAMS"]
       best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
       best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else None
+      position = state.position.get(self.symbol, 0)
       expectedValue = .1 * basket1Price
       if best_bid > expectedValue:
-         orders.append(Order(self.symbol, best_bid, -10))
+         orders.append(Order(self.symbol, best_bid, -self.limit + position))
       if best_ask < expectedValue:
-         orders.append(Order(self.symbol, best_ask, 10))
+         orders.append(Order(self.symbol, best_ask, self.limit - position))
       
       return orders
 
@@ -245,16 +323,6 @@ class VolcanicRock():
                 orders.append(Order(self.symbol, best_bid, volume))
 
     return orders
-
-         
-    
-    
-    
- 
-  
-
-
-
 
 class VolcanicVoucher():
     def __init__(self, symbol: str, strike_price: float, expiry_days: int, limit: int):
@@ -395,6 +463,8 @@ class Basket2():
         best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else None
         basket_mid_price = (best_bid + best_ask) / 2 if best_bid and best_ask else None
         return basket_mid_price
+    
+
 
     def run(self, state: TradingState):
       expectedValue1 = 0
@@ -453,11 +523,9 @@ class Djembe():
     
     return orders
 
-class Kelp():
+class Kelp(MarketMakeStrategy):
   def __init__(self, symbol, limit):
-    self.symbol = symbol
-    self.limit = limit
-
+    super().__init__(symbol, limit)
   ##Calculating the acceptable price
   def calculate_value(self, order_depth: OrderDepth, depth: int):
     if len(order_depth.sell_orders) != 0 and len(order_depth.buy_orders) != 0:
@@ -482,36 +550,20 @@ class Kelp():
     orders=[]
     
     order_depth = state.order_depths[self.symbol]
-    acceptable_price = self.calculate_value(order_depth, 5)
+    acceptable_price = round(self.calculate_value(order_depth, 5))
 
-    trade(state, self.symbol, True, orders, acceptable_price)
-    trade(state, self.symbol, False, orders, acceptable_price)
-  
+    orders = self.market_make(state, acceptable_price)
+    
     return orders
         
-class RainForestResin():
+class RainForestResin(MarketMakeStrategy):
   def __init__(self, symbol: str, limit: int):
-    self.symbol = symbol
-    self.limit = limit
-  
+    super().__init__(symbol, limit)
+
   def run(self, state: TradingState) -> List[Order]:
-    orders=[]
+  
     acceptable_price = 10000
-    order_depth = state.order_depths[self.symbol]   
-                                                    ###orderJams = state.order_depths["Jams"]
-    if len(order_depth.sell_orders) != 0:
-      best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-      if int(best_ask) < acceptable_price:
-          orders.append(Order(self.symbol, best_ask, -best_ask_amount))
-          orders.append(Order(self.symbol, 9992, 25))
-          
-    
-    if len(order_depth.buy_orders) != 0:
-      best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-      if int(best_bid) > acceptable_price:       
-          orders.append(Order(self.symbol, best_bid, -best_bid_amount))
-          orders.append(Order(self.symbol, 10008, -25))
-          
+    orders = self.market_make(state, acceptable_price) 
     return orders
 
 
@@ -581,8 +633,8 @@ class Trader:
         "KELP": Kelp("KELP", 50),
         "SQUID_INK": SquidInk("SQUID_INK", 50), 
         "PICNIC_BASKET1": Basket1("PICNIC_BASKET1", 60),
-        #"CROISSANTS": Croissants("CROISSANTS", 250),
-        "JAMS": Jams("JAMS", 350),
+        "CROISSANTS": Croissants("CROISSANTS", 250),
+        #"JAMS": Jams("JAMS", 350),
         "DJEMBE": Djembe("DJEMBE", 60),
         "PICNIC_BASKET2": Basket2("PICNIC_BASKET2", 100), 
         "VOLCANIC_ROCK_VOUCHER_9500": VolcanicVoucher("VOLCANIC_ROCK_VOUCHER_9500", 9500, expiry_days=5, limit=200),
