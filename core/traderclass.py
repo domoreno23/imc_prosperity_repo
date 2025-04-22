@@ -57,8 +57,6 @@ class MagnificientMacroons:
         self.sunlight_window.append(sunlight)
         low_sunlight_count = sum(s < self.csi for s in self.sunlight_window)
         low_sunlight_ratio = low_sunlight_count / len(self.sunlight_window)
-
-
         
         #Used ML model to compute the coefficients and intercept locally
         a, b, c, d, e = -0.74460938, 12.62199989,  36.16015896, -31.11214568,  26.93065467
@@ -583,7 +581,7 @@ class Trader:
         "KELP": Kelp("KELP", 50),
         "SQUID_INK": SquidInk("SQUID_INK", 50), 
         "PICNIC_BASKET1": Basket1("PICNIC_BASKET1", 60),
-        "CROISSANTS": Croissants("CROISSANTS", 250),
+        #"CROISSANTS": Croissants("CROISSANTS", 250),
         "JAMS": Jams("JAMS", 350),
         "DJEMBE": Djembe("DJEMBE", 60),
         "PICNIC_BASKET2": Basket2("PICNIC_BASKET2", 100), 
