@@ -6,8 +6,6 @@ import json
 from statistics import NormalDist
 from collections import deque
 import pandas as pd
-######################
-
 
 class MarketMakeStrategy():
   def __init__(self, symbol: string, limit: int):
@@ -15,9 +13,7 @@ class MarketMakeStrategy():
      self.limit = limit
      self.window_size = 20
      self.window = deque()
-     
-     
-
+    
   def market_make(self, state: TradingState, true_value: int):
       orders = []
       order_depth = state.order_depths[self.symbol]
@@ -83,8 +79,6 @@ class MarketMakeStrategy():
       return orders
 
 
-
-#Global trade function used by any class
 def trade(state:TradingState, symbol: string, is_buy_orders: bool, orders: list[Order], acceptable_price: int):
   
   order_depth = state.order_depths[symbol]  
@@ -148,8 +142,6 @@ class MagnificientMacroons:
         max_buy = self.limit - position
         max_sell = self.limit + position
 
-        
-
         if fair_price > best_ask:
             volume = min(max_buy, best_ask_amount)
             if volume > 0:
@@ -161,11 +153,6 @@ class MagnificientMacroons:
                 orders.append(Order(self.symbol, best_bid, volume))
 
         return orders
-
-
-
-
-
 
 class Croissants():
     def __init__(self, symbol: str, limit: int):
@@ -190,11 +177,9 @@ class Croissants():
       sell_price = max(order_depth.buy_orders.keys())
 
       if any(t.buyer == "Caesar" and t.seller == "Olivia" for t in trades):
-         print("helo")
          orders.append(Order(self.symbol, sell_price, -self.limit + position ))
 
-      if any(t.buyer == "Olivia" and t.seller == "Caesar" for t in trades):
-         
+      if any(t.buyer == "Olivia" and t.seller == "Caesar" for t in trades):         
          orders.append(Order(self.symbol, buy_price, self.limit - position ))
 
       return orders
@@ -232,14 +217,6 @@ class Jams(MarketMakeStrategy):
       return orders
 
 
-#trade(state, self.symbol, t/f, orders, acceptable_price)
-
-#take marketprice-theoritcal, which underprices is alot buy that
-
-#SUM UP POSITIONS AND TAKE THE OPPOSTITE OF THAT (BUY/SHORT) AND DO THAT
-
-#Carlos will solve this
-
 class VolcanicRock():
   def __init__(self, symbol: str, limit: int):
     self.symbol = symbol
@@ -273,10 +250,7 @@ class VolcanicRock():
             return NormalDist().cdf(d1)
         except:
             return 0.0  # Fallback if calculation fails
-
-    
-
-
+        
   def estimate_volatility(self):
         if len(self.vol_history) < 2:
           return 0.20
@@ -284,8 +258,6 @@ class VolcanicRock():
         return np.std(returns) * np.sqrt(252) if len(returns) > 1 else 0.0
     
   def run(self, state: TradingState) -> List[Order]:
-    #Potentially, everytime a voucher is run, i run this class, and i check the position of this classs
-
     orders = []
 
     rock_mid_price = self.get_mid_price(state.order_depths[self.symbol])
@@ -295,7 +267,7 @@ class VolcanicRock():
             self.vol_history.pop(0)
 
     sigma = self.estimate_volatility()
-    T = 5
+    T = 2/365
     sum_delta = 0
 
     rock_depth = state.order_depths[self.symbol]
@@ -464,8 +436,7 @@ class Basket2():
         basket_mid_price = (best_bid + best_ask) / 2 if best_bid and best_ask else None
         return basket_mid_price
     
-
-
+    
     def run(self, state: TradingState):
       expectedValue1 = 0
       if any(symbol not in state.order_depths for symbol in ["JAMS", "CROISSANTS", "DJEMBE"]):
@@ -621,9 +592,6 @@ class SquidInk():
     
     return orders
   
-
-
-
 class Trader:
     def __init__(self):
     
@@ -651,9 +619,6 @@ class Trader:
             if hasattr(self.strategies[product], "products"):
                 self.strategies[product].products = self.strategies
             
-
-      
-
       self.trader_data = {}  #storing state between rounds
 
     def run(self, state: TradingState):
@@ -671,12 +636,8 @@ class Trader:
                   result[product] = orders
               except Exception as e:
                 print(f"Error executing strategy for {product}: {str(e)}")
-            
-                
-      
+
   
         trader_data_str = json.dumps(self.trader_data)
-        
-				# Sample conversion request. Check more details below. 
         conversions = 1
         return result, conversions, trader_data_str
